@@ -1,4 +1,37 @@
 # coding: utf-8
+'''Spatial transformation library.
+
+Description
+===========
+
+Create and apply several spatial 2D and 3D transformations including conformal,
+bilinear, projective, polynomial and affine transformation. You can determine
+the over-, well- and under-determined parameters with the least-squares method.
+
+Create 2D and 3D rotation matrices.
+
+Usage
+=====
+
+>>> tform = make_tform('conformal', np.array([[1,1], [2,2]]),
+... np.array([[3,4], [10,10]]))
+>>> tform.params
+array([-3.25,  3.25, -2.75, -3.25])
+>>> tform.params_explicit
+array([-3.25      , -2.75      ,  4.59619408, -0.78539816])
+>>> tform.fwd(np.array([[0, 0], [100,100]]))
+array([[  -3.25,   -2.75],
+       [ 646.75,   -2.75]])
+>>> tform.inv(tform.fwd(np.array([[0, 0], [100,100]])))
+array([[   0.,    0.],
+       [ 100.,  100.]])
+
+Reference
+=========
+
+"Nahbereichsphotogrammetrie - Grundlagen, Methoden und Anwendungen",
+    Thomas Luhmann, 2010
+'''
 import warnings
 import numpy as np
 import math
@@ -7,7 +40,7 @@ import math
 def make_tform(ttype, src, dst):
     '''
     Create spatial transformation.
-    You can determine the over-, well- and under-determined result
+    You can determine the over-, well- and under-determined parameters
     with the least-squares method.
     The following transformation types are supported:
 
@@ -40,7 +73,7 @@ def make_conformal(src, dst):
     where the transformation is defined as:
         X = a0 + a1*x - b1*y
         Y = b0 + b1*x + a1*y
-    You can determine the over-, well- and under-determined result
+    You can determine the over-, well- and under-determined parameters
     with the least-squares method.
 
     Explicit parameters are in the order:
@@ -72,7 +105,7 @@ def make_conformal(src, dst):
     b[rows:] = dst[:,1]
     params = np.linalg.lstsq(A, b)[0]
     #: determine explicit params
-    a0, b0 = params[:0], params[:2]
+    a0, b0 = params[0], params[2]
     alpha = math.atan2(params[3], params[1])
     m = params[1] / math.cos(alpha)
     params_explicit = np.array([a0, b0, m, alpha])
@@ -112,7 +145,7 @@ def make_bilinear(src, dst):
     where the transformation is defined as:
         X = a0 + a1*x + a2*y + a3*x*y
         Y = b0 + b1*x + b2*y + b3*x*y
-    You can determine the over-, well- and under-determined result
+    You can determine the over-, well- and under-determined parameters
     with the least-squares method.
 
     :param src: :class:`numpy.array`
@@ -177,7 +210,7 @@ def make_projective(src, dst):
     where the transformation is defined as:
         X = (a0+a1*x+a2*y) / (1+c0*x+c1*y)
         Y = (b0+b1*x+b2*y) / (1+c0*x+c1*y)
-    You can determine the over-, well- and under-determined result
+    You can determine the over-, well- and under-determined parameters
     with the least-squares method.
 
     :param src: :class:`numpy.array`
@@ -243,7 +276,7 @@ def make_polynomial(src, dst, n):
     where the transformation is defined as:
         X = sum[j=0:n](sum[i=0:j](a_ji * x**(j-i)*y**i))
         Y = sum[j=0:n](sum[i=0:j](b_ji * x**(j-i)*y**i))
-    You can determine the over-, well- and under-determined result
+    You can determine the over-, well- and under-determined parameters
     with the least-squares method.
 
     :param src: :class:`numpy.array`
@@ -315,7 +348,7 @@ def make_affine(src, dst):
         X = a0 + a1*x + a2*y[ + a3*z]
         Y = b0 + b1*x + b2*y[ + b3*z]
         [Z = c0 + c1*x + c2*y + c3*z]
-    You can determine the over-, well- and under-determined result
+    You can determine the over-, well- and under-determined parameters
     with the least-squares method.
     Source and destination coordinates must be Nx2 or Nx3 matrices (x, y, z).
 
@@ -476,7 +509,14 @@ class Transformation(object):
             Nx2 or Nx3 coordinate matrix
         '''
 
-        return self.TFUNCS[self.ttype](coords, self.params, inverse=False)
+        single = False
+        if coords.ndim == 1:
+            coords = np.array([coords])
+            single = True
+        result = self.TFUNCS[self.ttype](coords, self.params, inverse=False)
+        if single:
+            return result[0]
+        return result
 
     def inv(self, coords):
         '''
@@ -486,7 +526,14 @@ class Transformation(object):
             Nx2 or Nx3 coordinate matrix
         '''
 
-        return self.TFUNCS[self.ttype](coords, self.params, inverse=True)
+        single = False
+        if coords.ndim == 1:
+            coords = np.array([coords])
+            single = True
+        result = self.TFUNCS[self.ttype](coords, self.params, inverse=True)
+        if single:
+            return result[0]
+        return result
 
 
 def rotation_matrix(angle, dim=2, axis=None):
