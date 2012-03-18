@@ -4,7 +4,7 @@
 Description
 ===========
 
-Create and apply several spatial 2D and 3D transformations including conformal,
+Create and apply several spatial 2D and 3D transformations including similarity,
 bilinear, projective, polynomial and affine transformation. You can determine
 the over-, well- and under-determined parameters with the least-squares method.
 
@@ -13,7 +13,7 @@ Create 2D and 3D rotation matrices.
 Usage
 =====
 
->>> tform = make_tform('conformal', np.array([[1,1], [2,2]]),
+>>> tform = make_tform('similarity', np.array([[1,1], [2,2]]),
 ... np.array([[3,4], [10,10]]))
 >>> tform.params
 array([-3.25,  3.25, -2.75, -3.25])
@@ -37,6 +37,14 @@ import numpy as np
 import math
 
 
+TRANSFORMATIONS = [
+    'similarity',
+    'bilinear',
+    'projective',
+    'polynomial',
+    'affine',
+]
+
 def make_tform(ttype, src, dst):
     '''
     Create spatial transformation.
@@ -45,7 +53,7 @@ def make_tform(ttype, src, dst):
     The following transformation types are supported:
 
         NAME / TTYPE            DIM     NUM POINTS FOR EXACT SOLUTION
-        conformal:              2D      2
+        similarity:              2D      2
         bilinear:               2D      4
         projective:             2D      4
         polynomial (order n):  2D      (n+1)*(n+2)/2
@@ -54,7 +62,7 @@ def make_tform(ttype, src, dst):
 
     Number of source must match number of destination coordinates.
 
-    :param ttype: conformal, bilinear, projective, polynomial, affine
+    :param ttype: similarity, bilinear, projective, polynomial, affine
         transformation type
     :param src: :class:`numpy.array`
         Nx2 or Nx3 coordinate matrix of source coordinate system
@@ -64,12 +72,16 @@ def make_tform(ttype, src, dst):
     :returns: :class:`Transformation`
     '''
 
+    ttype = ttype.lower()
+    if ttype not in TRANSFORMATIONS:
+        raise NotImplemented(
+            'Your transformation type %s is not implemented' % ttype)
     params, params_explicit = MFUNCS[ttype](src, dst)
     return Transformation(ttype, params, params_explicit)
 
-def make_conformal(src, dst):
+def make_similarity(src, dst):
     '''
-    Determine parameters of 2D conformal transformation in the order:
+    Determine parameters of 2D similarity transformation in the order:
         a0, a1, b0, b1
     where the transformation is defined as:
         X = a0 + a1*x - b1*y
@@ -112,9 +124,9 @@ def make_conformal(src, dst):
     params_explicit = np.array([a0, b0, m, alpha])
     return params, params_explicit
 
-def conformal_transform(coords, params, inverse=False):
+def similarity_transform(coords, params, inverse=False):
     '''
-    Apply conformal transformation.
+    Apply similarity transformation.
 
     :param coords: :class:`numpy.array`
         Nx2 coordinate matrix of source coordinate system
@@ -469,14 +481,14 @@ def affine_transform(coords, params, inverse=False):
 
 
 MFUNCS = {
-    'conformal': make_conformal,
+    'similarity': make_similarity,
     'bilinear': make_bilinear,
     'projective': make_projective,
     'polynomial': make_polynomial,
     'affine': make_affine,
 }
 TFUNCS = {
-    'conformal': conformal_transform,
+    'similarity': similarity_transform,
     'bilinear': bilinear_transform,
     'projective': projective_transform,
     'polynomial': polynomial_transform,
@@ -491,7 +503,7 @@ class Transformation(object):
         Create transformation which allows you to do forward and inverse
         transformation and view the transformation parameters.
 
-        :param ttype: conformal, bilinear, projective, polynomial, affine
+        :param ttype: similarity, bilinear, projective, polynomial, affine
             transformation type
         :param params: :class:`numpy.array`
             transformation parameters
