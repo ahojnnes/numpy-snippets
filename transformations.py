@@ -48,7 +48,7 @@ def make_tform(ttype, src, dst):
         conformal:              2D      2
         bilinear:               2D      4
         projective:             2D      4
-        polynomial (degree n):  2D      (n+1)*(n+2)/2
+        polynomial (order n):  2D      (n+1)*(n+2)/2
         affine:                 2D      3
         affine:                 3D      4
 
@@ -64,7 +64,8 @@ def make_tform(ttype, src, dst):
     :returns: :class:`Transformation`
     '''
 
-    return Transformation.MFUNCS[ttype](src, dst)
+    params, params_explicit = MFUNCS[ttype](src, dst)
+    return Transformation(ttype, params, params_explicit)
 
 def make_conformal(src, dst):
     '''
@@ -87,7 +88,7 @@ def make_conformal(src, dst):
     :param src: :class:`numpy.array`
         Nx2 coordinate matrix of destination coordinate system
 
-    :returns: :class:`Transformation`
+    :returns: params, params_explicit
     '''
 
     xs = src[:,0]
@@ -98,8 +99,8 @@ def make_conformal(src, dst):
     A[:rows,1] = xs
     A[:rows,3] = - ys
     A[rows:,2] = 1
+    A[rows:,3] = xs
     A[rows:,1] = ys
-    A[rows:,3] = - xs
     b = np.zeros((rows*2,))
     b[:rows] = dst[:,0]
     b[rows:] = dst[:,1]
@@ -109,7 +110,7 @@ def make_conformal(src, dst):
     alpha = math.atan2(params[3], params[1])
     m = params[1] / math.cos(alpha)
     params_explicit = np.array([a0, b0, m, alpha])
-    return Transformation('conformal', params, params_explicit)
+    return params, params_explicit
 
 def conformal_transform(coords, params, inverse=False):
     '''
@@ -153,12 +154,12 @@ def make_bilinear(src, dst):
     :param src: :class:`numpy.array`
         Nx2 coordinate matrix of destination coordinate system
 
-    :returns: :class:`Transformation`
+    :returns: params, None
     '''
 
     xs = src[:,0]
     ys = src[:,1]
-    # affine transformation is polynomial transformation of degree 1
+    # affine transformation is polynomial transformation of order 1
     rows = src.shape[0]
     A = np.zeros((rows*2, 8))
     A[:rows,0] = 1
@@ -173,7 +174,7 @@ def make_bilinear(src, dst):
     b[:rows] = dst[:,0]
     b[rows:] = dst[:,1]
     params = np.linalg.lstsq(A, b)[0]
-    return Transformation('bilinear', params)
+    return params, None
 
 def bilinear_transform(coords, params, inverse=False):
     '''
@@ -218,7 +219,7 @@ def make_projective(src, dst):
     :param src: :class:`numpy.array`
         Nx2 coordinate matrix of destination coordinate system
 
-    :returns: :class:`Transformation`
+    :returns: params, None
     '''
 
     xs = src[:,0]
@@ -239,7 +240,7 @@ def make_projective(src, dst):
     b[:rows] = dst[:,0]
     b[rows:] = dst[:,1]
     params = np.linalg.lstsq(A, b)[0]
-    return Transformation('projective', params)
+    return params, None
 
 def projective_transform(coords, params, inverse=False):
     '''
@@ -272,7 +273,7 @@ def projective_transform(coords, params, inverse=False):
 
 def make_polynomial(src, dst, n):
     '''
-    Determine parameters of 2D polynomial transformation of degree n,
+    Determine parameters of 2D polynomial transformation of order n,
     where the transformation is defined as:
         X = sum[j=0:n](sum[i=0:j](a_ji * x**(j-i)*y**i))
         Y = sum[j=0:n](sum[i=0:j](b_ji * x**(j-i)*y**i))
@@ -284,7 +285,7 @@ def make_polynomial(src, dst, n):
     :param src: :class:`numpy.array`
         Nx2 coordinate matrix of destination coordinate system
 
-    :returns: :class:`Transformation`
+    :returns: params, None
     '''
 
     xs = src[:,0]
@@ -303,7 +304,7 @@ def make_polynomial(src, dst, n):
     b[:rows] = dst[:,0]
     b[rows:] = dst[:,1]
     params = np.linalg.lstsq(A, b)[0]
-    return Transformation('polynomial', params)
+    return params, None
 
 def polynomial_transform(coords, params, inverse=False):
     '''
@@ -378,7 +379,7 @@ def make_affine(src, dst):
     :param src: :class:`numpy.array`
         Nx2 or Nx3 coordinate matrix of destination coordinate system
 
-    :returns: :class:`Transformation`
+    :returns: params, params_explicit
     '''
 
     xs = src[:,0]
@@ -416,7 +417,7 @@ def make_affine(src, dst):
     beta = math.atan2(-c1, math.sqrt(a1**2+b1**2))
     gamma = math.atan2(b1, a1)
     params_explicit = np.array([a0, b0, c0, mx, my, mz, alpha, beta, gamma])
-    return Transformation('affine', params, params_explicit)
+    return params, params_explicit
 
 def affine_transform(coords, params, inverse=False):
     '''
@@ -467,22 +468,23 @@ def affine_transform(coords, params, inverse=False):
     return out
 
 
-class Transformation(object):
+MFUNCS = {
+    'conformal': make_conformal,
+    'bilinear': make_bilinear,
+    'projective': make_projective,
+    'polynomial': make_polynomial,
+    'affine': make_affine,
+}
+TFUNCS = {
+    'conformal': conformal_transform,
+    'bilinear': bilinear_transform,
+    'projective': projective_transform,
+    'polynomial': polynomial_transform,
+    'affine': affine_transform,
+}
 
-    MFUNCS = {
-        'conformal': make_conformal,
-        'bilinear': make_bilinear,
-        'projective': make_projective,
-        'polynomial': make_polynomial,
-        'affine': make_affine,
-    }
-    TFUNCS = {
-        'conformal': conformal_transform,
-        'bilinear': bilinear_transform,
-        'projective': projective_transform,
-        'polynomial': polynomial_transform,
-        'affine': affine_transform,
-    }
+
+class Transformation(object):
 
     def __init__(self, ttype, params, params_explicit=None):
         '''
@@ -513,7 +515,7 @@ class Transformation(object):
         if coords.ndim == 1:
             coords = np.array([coords])
             single = True
-        result = self.TFUNCS[self.ttype](coords, self.params, inverse=False)
+        result = TFUNCS[self.ttype](coords, self.params, inverse=False)
         if single:
             return result[0]
         return result
@@ -530,7 +532,7 @@ class Transformation(object):
         if coords.ndim == 1:
             coords = np.array([coords])
             single = True
-        result = self.TFUNCS[self.ttype](coords, self.params, inverse=True)
+        result = TFUNCS[self.ttype](coords, self.params, inverse=True)
         if single:
             return result[0]
         return result
