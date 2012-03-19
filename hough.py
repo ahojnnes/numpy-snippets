@@ -28,8 +28,10 @@ def hough(coords, rho_resolution=1, theta=None):
     # index for accessing hough space matrix
     theta_idx = np.arange(len(theta))
     rho_idx = np.zeros(theta.shape, 'int32')
+    theta_cos = np.cos(theta)
+    theta_sin = np.sin(theta)
     for x, y in coords:
-        rho = np.abs(x*np.cos(theta) + y*np.sin(theta))
+        rho = np.abs(x*theta_cos + y*theta_sin)
         np.round((rho - rho_min) / rho_resolution, out=rho_idx)
         hough_space[rho_idx,theta_idx] += 1
     return hough_space, np.arange(0, rho_max, rho_resolution), theta
