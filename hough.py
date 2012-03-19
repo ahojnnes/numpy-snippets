@@ -34,7 +34,7 @@ def hough(coords, rho_resolution=1, theta=None):
         rho = np.abs(x*theta_cos + y*theta_sin)
         np.round((rho - rho_min) / rho_resolution, out=rho_idx)
         hough_space[rho_idx,theta_idx] += 1
-    return hough_space, np.arange(0, rho_max, rho_resolution), theta
+    return hough_space, np.arange(rho_min, rho_max, rho_resolution), theta
 
 def hough_peaks(hough_space, rho, theta, num=1):
     '''
