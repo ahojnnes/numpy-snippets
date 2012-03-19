@@ -20,9 +20,8 @@ def hough(coords, rho_resolution=1, theta=None):
         theta = np.arange(-90, 90, 1)
         theta = theta / 360. * 2 * math.pi
     rho_resolution = float(rho_resolution)
-    rho_min = math.floor(math.sqrt(np.min(coords[:,0])**2 + np.min(coords[:,1])**2))
     rho_max = math.ceil(math.sqrt(np.max(coords[:,0])**2 + np.max(coords[:,1])**2))
-    rho_num = (rho_max - rho_min) / rho_resolution
+    rho_num = rho_max / rho_resolution
     # hough space matrix as rho:theta
     hough_space = np.zeros((math.ceil(rho_num)+1, len(theta)))
     # index for accessing hough space matrix
@@ -32,9 +31,9 @@ def hough(coords, rho_resolution=1, theta=None):
     theta_sin = np.sin(theta)
     for x, y in coords:
         rho = np.abs(x*theta_cos + y*theta_sin)
-        np.round((rho - rho_min) / rho_resolution, out=rho_idx)
+        np.round(rho / rho_resolution, out=rho_idx)
         hough_space[rho_idx,theta_idx] += 1
-    return hough_space, np.arange(rho_min, rho_max, rho_resolution), theta
+    return hough_space, np.arange(0, rho_max, rho_resolution), theta
 
 def hough_peaks(hough_space, rho, theta, num=1):
     '''
